@@ -5,6 +5,39 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(googlesheets4)
 ```
 
+# Ideas
+How do I want to serve up results?
+1) Shiny App
+2) Flexdashboard - can this be embedeed as a blog post?
+3) Interactive plots in a Blog post
+
+Likely path is to create a flexdashboard for my blog, then have a blogpost with a link to the flexdashboard.
+The flexdashboard itself will not be in the blog post.
+
+https://blogdown-demo.rbind.io/2017/09/06/adding-r-markdown-documents-of-other-output-formats/
+https://github.com/yihui/blogdown-static
+
+
+https://community.rstudio.com/t/host-flexdashboard-on-blogdown-site/76355
+
+
+
+This seems to have a flexdashboard in the blogpost
+https://www.benjaminsorensen.me/post/libib-dashboard/
+
+# Connect to google sheets
+Browser authentication and store credentials to be used  between R sessions locally
+```{r}
+run_df <- read_sheet("https://docs.google.com/spreadsheets/d/16rDndbsyUb95yq5CbrtPGWWWnP0FB_HoMU2YUdj2y2s")
+
+```
+
+
+```{r}
+
+```
 
