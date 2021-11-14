@@ -9,6 +9,7 @@ library(tidyverse)
 library(googlesheets4)
 library(lubridate)
 library(janitor)
+library(plotly)
 ```
 
 # Ideas
@@ -41,7 +42,8 @@ run_df <- read_sheet("https://docs.google.com/spreadsheets/d/16rDndbsyUb95yq5Cbr
 
 ```
 
-
+remove the data that did not record 1 km spilts (just one entry for entire run)
+then for each split, calculate the time for that distance
 ```{r}
 run_df1 <- run_df %>% 
   filter(split_distance <= 1) %>% 
@@ -57,9 +59,9 @@ run_df1 <- run_df %>%
 
 
 
-# some trending/display ideas
+# calculations
 
-  
+group the splits and do summary calculations  
 ```{r}
 run_collatedruns_df1 <- run_df1 %>% 
   group_by(date, run) %>% 
@@ -71,8 +73,9 @@ run_collatedruns_df1 <- run_df1 %>%
                           TRUE ~ as.character(avg_pace_seconds)
                           )
          ) %>%
-  unite(avg_pace_chr, avg_pace_minutes, temp, sep = ":") %>% 
-  select(-avg_pace_seconds)
+  mutate(avg_pace_chr = paste0(avg_pace_minutes,"'", temp, "\"/km")) %>% 
+  # unite(avg_pace_chr2, avg_pace_minutes, temp, sep = ":") %>% 
+  select(-avg_pace_minutes, -temp, -avg_pace_seconds,)
 
 
 ```
@@ -92,6 +95,97 @@ run_df2 <- run_df %>%
                           TRUE ~ as.character(avg_pace_seconds)
                           )
          ) %>%
-  unite(avg_pace_chr, avg_pace_minutes, temp, sep = ":") %>% 
-  select(-avg_pace_seconds, -split_distance, -split_pace_minutes, -split_pace_seconds)
+  mutate(avg_pace_chr = paste0(avg_pace_minutes,"'", temp, "\"/km")) %>% 
+  # unite(avg_pace_chr2, avg_pace_minutes, temp, sep = ":") %>% 
+  select(-avg_pace_minutes, -temp, -avg_pace_seconds, -split_distance, -split_pace_minutes, -split_pace_seconds)
+
 ```
+
+
+Apply some filters - maybe these can be dynamic filter with presets
+```{r}
+run_df3 <- run_collatedruns_df1 %>% 
+  bind_rows(run_df2) %>% 
+  mutate(year = year(date)) %>% 
+  filter(avg_pace < 9) %>%  # any runs greater than 9min/km was either walking, or part of the run was walking or complete stand still to catch pokemon or hack a portal
+  filter(run_distance > 3) %>% 
+  arrange(date) %>% 
+  # make the date as day month and add factor levels based on the dataframe order
+  mutate(datemd = paste(day(date), month(date, label = TRUE, abbr = TRUE), sep="-"),
+         datemd = factor(datemd, levels = unique(datemd)))
+  
+```
+
+
+
+# visualisations
+
+number of runs per year
+
+```{r}
+
+run_df3 %>% 
+  group_by(year) %>% 
+  summarise(num_runs = n()) %>% 
+  ggplot(aes(x = factor(year), y = num_runs)) +
+  geom_col(fill = "darkred") +
+  geom_text(aes(label =  num_runs, y= num_runs), vjust = -0.5, colour = "black") +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black")) +
+  labs(x = "Year", y = "Number of runs") 
+
+```
+
+
+pace by date / run
+
+Turn your 'treatment' column into a character vector
+data$Treatment <- as.character(data$Treatment)
+Then turn it back into a factor with the levels in the correct order
+data$Treatment <- factor(data$Treatment, levels=unique(data$Treatment))
+
+```{r}
+p1 <- run_df3 %>% 
+  filter(year == 2016) %>% 
+  ggplot() +
+  geom_point(aes(x=datemd, 
+                 y = avg_pace, 
+                 colour = run_distance, 
+                 text = paste("Date:", datemd, 
+                              "\nPace:", avg_pace_chr,
+                              "\nDistance", run_distance, "km")
+                          
+                 )
+             ) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        axis.text.x = element_text(angle = 90, vjust = 0.5)) 
+
+ggplotly(p1, tooltip = "text")
+```
+
+
+```{r}
+run_df3 %>% 
+  ggplot() +
+  geom_point(aes(x=datemd, 
+                 y = avg_pace, 
+                 colour = run_distance, 
+                 text = paste("Date:", datemd, 
+                              "\nPace:", avg_pace_chr,
+                              "\nDistance", run_distance, "km")
+                          
+                 )
+             ) +
+  theme(panel.grid.major = element_blank(), 
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank(), 
+        axis.line = element_line(colour = "black"),
+        axis.text.x = element_text(angle = 90, vjust = 0.5))  +
+  facet_wrap(~year)
+```
+
