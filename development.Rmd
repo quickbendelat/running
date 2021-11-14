@@ -7,6 +7,8 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(googlesheets4)
+library(lubridate)
+library(janitor)
 ```
 
 # Ideas
@@ -32,12 +34,64 @@ https://www.benjaminsorensen.me/post/libib-dashboard/
 # Connect to google sheets
 Browser authentication and store credentials to be used  between R sessions locally
 ```{r}
-run_df <- read_sheet("https://docs.google.com/spreadsheets/d/16rDndbsyUb95yq5CbrtPGWWWnP0FB_HoMU2YUdj2y2s")
+run_df <- read_sheet("https://docs.google.com/spreadsheets/d/16rDndbsyUb95yq5CbrtPGWWWnP0FB_HoMU2YUdj2y2s",
+                     col_types = "Ddddd") %>% 
+  clean_names() %>% 
+  fill(date)
 
 ```
 
 
 ```{r}
+run_df1 <- run_df %>% 
+  filter(split_distance <= 1) %>% 
+  mutate(split_pace_minutes2 = split_pace_minutes + split_pace_seconds/60,
+         split_minutes = split_distance * split_pace_minutes2) %>% 
+  mutate(temp = case_when(nchar(split_pace_seconds) == 1 ~ paste0("0",split_pace_seconds),
+                          TRUE ~ as.character(split_pace_seconds)
+                          )
+         ) %>% 
+  unite(split_pace_ms_chr, split_pace_minutes, temp, sep = ":") %>% 
+  select(-split_pace_minutes2, -split_pace_seconds)
+```
+
+
+
+# some trending/display ideas
+
+  
+```{r}
+run_collatedruns_df1 <- run_df1 %>% 
+  group_by(date, run) %>% 
+  summarise(run_distance = sum(split_distance), run_minutes = sum(split_minutes)) %>% 
+  mutate(avg_pace = run_minutes / run_distance,
+         avg_pace_minutes = trunc(avg_pace),
+         avg_pace_seconds = round((avg_pace - avg_pace_minutes)*60, digits = 0)) %>% 
+  mutate(temp = case_when(nchar(avg_pace_seconds) == 1 ~ paste0("0",avg_pace_seconds),
+                          TRUE ~ as.character(avg_pace_seconds)
+                          )
+         ) %>%
+  unite(avg_pace_chr, avg_pace_minutes, temp, sep = ":") %>% 
+  select(-avg_pace_seconds)
+
 
 ```
 
+
+
+
+```{r}
+run_df2 <- run_df %>% 
+  filter(split_distance > 1) %>% 
+  mutate(run_distance = split_distance,
+         run_minutes = split_pace_minutes + split_pace_seconds / 60) %>% 
+  mutate(avg_pace = run_minutes / run_distance,
+         avg_pace_minutes = trunc(avg_pace),
+         avg_pace_seconds = round((avg_pace - avg_pace_minutes)*60, digits = 0)) %>% 
+  mutate(temp = case_when(nchar(avg_pace_seconds) == 1 ~ paste0("0",avg_pace_seconds),
+                          TRUE ~ as.character(avg_pace_seconds)
+                          )
+         ) %>%
+  unite(avg_pace_chr, avg_pace_minutes, temp, sep = ":") %>% 
+  select(-avg_pace_seconds, -split_distance, -split_pace_minutes, -split_pace_seconds)
+```
